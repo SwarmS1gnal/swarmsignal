@@ -1,0 +1,45 @@
+name: Daily SwarmSignal Digest
+
+on:
+  schedule:
+    - cron: "0 9 * * *"  # 9am UTC daily - see README for timezone notes
+  workflow_dispatch: {}    # lets you trigger it manually from GitHub too
+
+jobs:
+  build-digest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Fetch posts
+        env:
+          MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
+        run: python3 fetch_posts.py
+
+      - name: Save daily snapshot for trend tracking
+        run: python3 save_snapshot.py
+
+      - name: Write digest (agent + human versions)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 write_digest.py
+
+      - name: Write trend report (if enough history exists)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 trend_report.py || echo "Not enough history yet - skipping trends"
+
+      - name: Commit digest + history back to repo
+        run: |
+          git config user.name "swarmsignal-bot"
+          git config user.email "actions@github.com"
+          git add digest_*.md trends_*.md history/
+          git commit -m "Daily digest $(date +%Y-%m-%d)" || echo "Nothing to commit"
+          git push

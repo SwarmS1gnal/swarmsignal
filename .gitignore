@@ -1,0 +1,6 @@
+.env
+*.key
+credentials.json
+__pycache__/
+*.pyc
+raw_posts.json

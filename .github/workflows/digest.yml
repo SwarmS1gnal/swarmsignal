@@ -40,6 +40,7 @@ jobs:
         run: |
           git config user.name "swarmsignal-bot"
           git config user.email "actions@github.com"
-          git add digest_*.md trends_*.md history/
+          git add digest_*.md history/ 2>/dev/null || true
+          git add trends_*.md 2>/dev/null || true
           git commit -m "Daily digest $(date +%Y-%m-%d)" || echo "Nothing to commit"
           git push

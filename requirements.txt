@@ -1,6 +1,6 @@
 flask
 x402[evm]
-x402[extensions]
+jsonschema
 httpx
 eth-account
 requests

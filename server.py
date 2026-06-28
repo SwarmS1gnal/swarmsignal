@@ -31,17 +31,18 @@ from x402.extensions.bazaar.server import bazaar_resource_server_extension
 # address (starts with 0x...) - never put a private key in this file.
 PAY_TO_ADDRESS = os.environ.get("PAY_TO_ADDRESS", "0xREPLACE_WITH_YOUR_ADDRESS")
 
-# Network: start on testnet (fake money, safe to experiment).
-# "eip155:84532" = Base Sepolia (testnet)
-# "eip155:8453"  = Base mainnet (real money) - switch only when ready
-NETWORK = os.environ.get("X402_NETWORK", "eip155:84532")
+# Network: "eip155:84532" = Base Sepolia (testnet, fake money)
+#          "eip155:8453"  = Base mainnet (real money)
+NETWORK = os.environ.get("X402_NETWORK", "eip155:8453")
 
 # Price per query
 PRICE = os.environ.get("X402_PRICE", "$0.02")
 
-# Public testnet facilitator (no signup needed). For mainnet, use Coinbase's
-# hosted facilitator per their docs instead.
-FACILITATOR_URL = os.environ.get("FACILITATOR_URL", "https://x402.org/facilitator")
+# Mainnet facilitator. PayAI is a no-auth-required community facilitator
+# supporting Base mainnet - chosen because Coinbase's own CDP facilitator
+# requires a custom auth scheme not yet supported by this Python library.
+# For testnet, https://x402.org/facilitator remains the right choice.
+FACILITATOR_URL = os.environ.get("FACILITATOR_URL", "https://facilitator.payai.network")
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 

@@ -1,0 +1,26 @@
+name: Weekly SwarmSignal Moltbook Post
+
+on:
+  schedule:
+    - cron: "0 9 * * 1"  # 9am UTC every Monday
+  workflow_dispatch: {}
+
+jobs:
+  post-to-moltbook:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run weekly post (auto-confirmed, auto-verified)
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
+          AUTO_CONFIRM: "1"
+        run: python3 weekly_post.py

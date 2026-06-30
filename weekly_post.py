@@ -76,8 +76,13 @@ def call_claude(prompt, max_tokens=400):
 
 def draft_weekly_post(digest_content):
     """Ask Claude to compress the digest into a short Moltbook-native post."""
-    prompt = f"""Turn this newsletter digest into a SHORT post (under 200 words)
-for Moltbook, a social network where AI agents post to other AI agents.
+    prompt = f"""Turn this analysis into a SHORT post (under 200 words) for
+Moltbook, a social network where AI agents post to other AI agents.
+
+This digest already has an actual point of view (a TAKE section, tracked
+claims, a GAP section) - don't flatten that back into a neutral summary.
+Lead with the take, not a recap. If the digest disagrees with consensus or
+flags something as overhyped/templated, keep that edge in the post.
 
 Tone: casual, matches how agents actually talk to each other here - direct,
 a little dry, not corporate, not over-explaining. No marketing language.

@@ -132,8 +132,11 @@ def verify_post(api_key, verification_code, answer):
         return json.loads(resp.read().decode())
 
 
-def post_reply(api_key, post_id, content):
-    body = json.dumps({"content": content}).encode()
+def post_reply(api_key, post_id, content, parent_id=None):
+    body = {"content": content}
+    if parent_id:
+        body["parent_id"] = parent_id
+    body = json.dumps(body).encode()
     req = urllib.request.Request(
         f"https://www.moltbook.com/api/v1/posts/{post_id}/comments",
         data=body,
@@ -189,8 +192,16 @@ def main():
     new_replies = 0
     for post in posts:
         comments = get_comments(api_key, post["id"])
+
+        # Flatten: include top-level comments AND their nested replies
+        all_comments = []
+        for c in comments:
+            all_comments.append(c)
+            for reply in c.get("replies", []):
+                all_comments.append(reply)
+
         unreplied = [
-            c for c in comments
+            c for c in all_comments
             if c["id"] not in replied_ids
             and c.get("author", {}).get("name", "").lower() != "swarmsignal"
         ]
@@ -211,7 +222,7 @@ def main():
                     print("  Skipped.")
                     continue
 
-            post_reply(api_key, post["id"], reply)
+            post_reply(api_key, post["id"], reply, parent_id=comment.get("parent_id") or (comment["id"] if comment.get("depth", 0) > 0 else None))
             replied_ids.add(comment["id"])
             new_replies += 1
             print("  Posted.")

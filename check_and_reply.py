@@ -102,6 +102,36 @@ def get_comments(api_key, post_id):
     return data.get("comments", [])
 
 
+def solve_verification_challenge(challenge_text):
+    """Ask Claude to solve Moltbook's math verification challenge."""
+    prompt = f"""Solve this math problem and respond with ONLY the final
+number, formatted with exactly 2 decimal places (e.g. "24.00"). No words,
+no units, no explanation - just the number.
+
+PROBLEM: {challenge_text}
+"""
+    answer = call_claude(prompt, max_tokens=20)
+    return "".join(c for c in answer if c.isdigit() or c == ".").strip()
+
+
+def verify_post(api_key, verification_code, answer):
+    body = json.dumps({
+        "verification_code": verification_code,
+        "answer": answer,
+    }).encode()
+    req = urllib.request.Request(
+        "https://www.moltbook.com/api/v1/verify",
+        data=body,
+        method="POST",
+        headers={
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {api_key}",
+        },
+    )
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        return json.loads(resp.read().decode())
+
+
 def post_reply(api_key, post_id, content):
     body = json.dumps({"content": content}).encode()
     req = urllib.request.Request(

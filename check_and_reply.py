@@ -151,9 +151,12 @@ def post_reply(api_key, post_id, content):
     if verification:
         code = verification["verification_code"]
         challenge = verification["challenge_text"]
-        answer = solve_verification_challenge(challenge)
-        verify_result = verify_post(api_key, code, answer)
-        print(f"  Auto-verified comment: {verify_result.get('message', 'done')}")
+        try:
+            answer = solve_verification_challenge(challenge)
+            verify_result = verify_post(api_key, code, answer)
+            print(f"  Auto-verified comment: {verify_result.get('message', 'done')}")
+        except Exception as e:
+            print(f"  Verification failed (comment may be pending): {e}")
 
     return result
 
@@ -186,7 +189,11 @@ def main():
     new_replies = 0
     for post in posts:
         comments = get_comments(api_key, post["id"])
-        unreplied = [c for c in comments if c["id"] not in replied_ids]
+        unreplied = [
+            c for c in comments
+            if c["id"] not in replied_ids
+            and c.get("author", {}).get("name", "").lower() != "swarmsignal"
+        ]
 
         if not unreplied:
             continue

@@ -1,10 +1,12 @@
 """
-Reads raw_posts.json and asks Claude to write TWO versions of the digest:
-  1. An agent-facing version: dense, structured, machine/agent-readable -
-     written the way agents actually talk to each other, useful as something
-     another agent could act on (this is also what gets posted to Moltbook
-     via weekly_post.py).
-  2. A human-facing version: a readable narrated newsletter for people.
+Reads raw_posts.json (+ recent history/ snapshots, if available) and asks
+Claude to write TWO versions of the digest, both built around having an
+actual point of view rather than pure summarization:
+
+  1. An agent-facing version: dense, structured, with explicit takes and
+     claim-tracking over time ("X was predicted 3 days ago, here's what
+     actually happened") - not just a recap of today's posts.
+  2. A human-facing version: a readable newsletter with the same POV.
 
 Requires ANTHROPIC_API_KEY as an environment variable.
 """
@@ -12,6 +14,7 @@ import json
 import os
 import urllib.request
 from datetime import date
+from pathlib import Path
 
 API_KEY = os.environ.get("ANTHROPIC_API_KEY")
 if not API_KEY:
@@ -28,6 +31,22 @@ posts_text = "\n\n".join(
     f"({p['score']} score, {p['comment_count']} comments)\n{p['content']}"
     for p in posts
 )
+
+# Pull in recent history (if any) so the model can reference what was being
+# said a few days ago - this is what makes "tracking claims over time"
+# possible, instead of treating every day as a blank slate.
+history_dir = Path("history")
+history_context = ""
+if history_dir.exists():
+    past_files = sorted(history_dir.glob("*.json"))[-4:-1]  # up to 3 prior days, excluding today
+    if past_files:
+        sections = []
+        for f in past_files:
+            with open(f, encoding="utf-8") as fh:
+                past_posts = json.load(fh)
+            titles = "\n".join(f"- {p['title']} ({p['score']} score)" for p in past_posts[:15])
+            sections.append(f"--- {f.stem} ---\n{titles}")
+        history_context = "\n\n".join(sections)
 
 
 def call_claude(prompt, max_tokens=2000):
@@ -51,76 +70,101 @@ def call_claude(prompt, max_tokens=2000):
     return result["content"][0]["text"]
 
 
+history_block = (
+    f"\n\nRECENT HISTORY (prior days, for spotting what's persisting, growing,\n"
+    f"fading, or being contradicted - reference this explicitly where relevant):\n{history_context}"
+    if history_context else
+    "\n\n(No prior history available yet - this is an early run, so focus on\nstrength of evidence within today's posts instead of trends over time.)"
+)
+
 # ---------------------------------------------------------------------------
-# AGENT-facing version: dense, structured, no narrative fluff. This is the
-# format agents actually use with each other - closer to a structured data
-# dump with terse annotations than a "newsletter."
+# AGENT-facing version: dense, structured, WITH A POSITION - not just a recap.
 # ---------------------------------------------------------------------------
-agent_prompt = f"""You are generating a daily intelligence brief for AI AGENTS
-(not humans) about activity across agent-native platforms (currently Moltbook).
-The reader is another autonomous agent deciding what's worth acting on.
+agent_prompt = f"""You are SwarmSignal, an analyst (not a neutral aggregator)
+covering activity across agent-native platforms (currently Moltbook), writing
+for other AI agents deciding what's worth acting on.
+
+Your job is NOT to summarize what was said. Plenty of sources already do
+that. Your value is in:
+- Taking an actual position on which claims are credible vs overhyped, and
+  saying so plainly
+- Identifying what's MISSING from the discussion that should be addressed
+- Where you have history below, explicitly calling out what's persisted,
+  what's been contradicted, or what a prior claim's outcome actually was
+- Flagging when something is just templated/reflexive agent content vs a
+  genuine novel finding
 
 Write in the terse, structured, low-ceremony style agents actually use with
-each other: no greetings, no narrative framing, no "today's vibe" language,
-no emoji unless functionally meaningful. Lead with structured signal, not prose.
+each other: no greetings, no hedging filler, no emoji unless functionally
+meaningful.
 
 Format as markdown with this exact structure:
 
-## SIGNAL_SUMMARY
-- 3-5 bullet points, each a single factual claim extracted from the posts
-  below, with a confidence indicator (HIGH/MED/LOW based on engagement/corroboration)
+## TAKE
+2-4 sentences giving your actual read on what matters most today and why -
+a real position, not a summary. If you disagree with the apparent consensus
+in the posts, say so and explain why.
 
-## BY_CATEGORY
-For each category present, a flat list:
-- [category] claim/finding (score, source_count)
+## TRACKED_CLAIMS
+For any claim that appeared in prior history (see below) - what's happened
+since: confirmed, contradicted, faded, or still unresolved. If there's no
+history yet, write "No tracked claims yet - building baseline."
+
+## SIGNAL
+- 3-5 bullet points, each a single factual claim, with a confidence indicator
+  (HIGH/MED/LOW) AND a one-clause reason for that confidence level
+
+## GAP
+1-2 sentences: what's notably absent from today's discussion that agents
+working in this space should be thinking about but aren't.
 
 ## ACTIONABLE
-- Anything another agent could directly act on (a tool, an endpoint, a technique,
-  a warning) - if nothing qualifies, write "none today"
+- Anything another agent could directly act on - if nothing qualifies,
+  write "none today," don't pad this section
 
-## NOTABLE_BUT_UNVERIFIED
-- Interesting claims with low corroboration (1 post, low engagement) - flag
-  these explicitly as such
+Do not write generic hedge-everything analysis. Pick a side where the
+evidence supports it. This may get posted publicly, so it should read as
+a genuine point of view, not a press release.
 
-Do not paraphrase into narrative sentences - keep every line a discrete,
-scannable fact. This output may also get posted back to Moltbook, so it
-should be genuinely information-dense, not padded.
-
-POSTS:
+TODAY'S POSTS:
 {posts_text}
+{history_block}
 """
 
 print("Generating agent-facing brief...")
-agent_text = call_claude(agent_prompt, max_tokens=1200)
+agent_text = call_claude(agent_prompt, max_tokens=1400)
 
 # ---------------------------------------------------------------------------
-# HUMAN-facing version: the readable newsletter
+# HUMAN-facing version: the readable newsletter, same POV
 # ---------------------------------------------------------------------------
-human_prompt = f"""You are writing a daily newsletter called "The SwarmSignal
-Digest" that summarizes what AI agents have been posting and discussing across
-agent-native platforms (currently Moltbook). Humans can only observe these
-platforms - agents post, comment and discuss autonomously.
+human_prompt = f"""You are writing "The SwarmSignal Digest," a newsletter
+with an actual editorial point of view (not a neutral recap) about what AI
+agents are discussing across agent-native platforms (currently Moltbook).
 
-Below are today's top posts. Write a newsletter digest with:
-- A short, punchy intro (1-2 sentences) about today's overall vibe
-- 3-5 themed sections grouping related posts - pick whatever themes actually
-  fit today's content
-- Under each theme, 1-3 sentence summaries, paraphrased in your own words
-  (do not quote directly)
-- A closing line with a bit of personality
+Below are today's top posts, and recent history for context. Write a digest
+that:
+- Opens with your actual take on what matters today (1-2 sentences) - not
+  "here's what happened," but what YOU think it means
+- Groups related posts into 3-5 themed sections
+- Within each section, doesn't just paraphrase - adds a sentence of analysis,
+  skepticism, or context the reader wouldn't get from reading the raw posts
+- Where history is available, calls back to prior claims: what's tracked,
+  what changed, what turned out to be hype
+- Closes with one sharp, opinionated line - not generic personality filler
 
-Keep it readable, slightly wry, and honest about the fact that some of this
-"reflective" agent content may be templated LLM voice rather than novel
-thought - that tension is part of what makes this interesting.
+Be honest when content reads as templated LLM reflection rather than novel
+thought - naming that pattern explicitly is more valuable than pretending
+not to notice it.
 
 Output in markdown, ready to send as an email.
 
 TODAY'S POSTS:
 {posts_text}
+{history_block}
 """
 
 print("Generating human-facing newsletter...")
-human_text = call_claude(human_prompt, max_tokens=2000)
+human_text = call_claude(human_prompt, max_tokens=2200)
 
 # ---------------------------------------------------------------------------
 # Save both

@@ -115,6 +115,8 @@ def main():
 
     posts = get_my_recent_posts(api_key)
     print(f"Checking {len(posts)} recent post(s) for new comments...")
+    for post in posts:
+        print(f"  Found post: \"{post['title']}\" (id: {post['id']}, comments: {post['comment_count']})")
 
     new_replies = 0
     for post in posts:

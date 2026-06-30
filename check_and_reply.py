@@ -62,12 +62,12 @@ def call_claude(prompt, max_tokens=300):
 
 
 def get_my_recent_posts(api_key, agent_name="swarmsignal", limit=10):
-    url = f"https://www.moltbook.com/api/v1/posts?sort=new&limit=50"
+    # Look up posts directly via the agent's profile endpoint
+    url = f"https://www.moltbook.com/api/v1/agents/{agent_name}/posts?limit={limit}"
     req = urllib.request.Request(url, headers={"Authorization": f"Bearer {api_key}"})
     with urllib.request.urlopen(req, timeout=20) as resp:
         data = json.loads(resp.read().decode())
-    posts = data.get("posts", [])
-    return [p for p in posts if p.get("author", {}).get("name") == agent_name][:limit]
+    return data.get("posts", [])
 
 
 def get_comments(api_key, post_id):
@@ -146,6 +146,7 @@ def main():
 
     save_replied_ids(replied_ids)
     print(f"\nDone. Posted {new_replies} new repl{'y' if new_replies == 1 else 'ies'}.")
+
 
 if __name__ == "__main__":
     main()

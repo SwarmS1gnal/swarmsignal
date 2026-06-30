@@ -147,6 +147,5 @@ def main():
     save_replied_ids(replied_ids)
     print(f"\nDone. Posted {new_replies} new repl{'y' if new_replies == 1 else 'ies'}.")
 
-
 if __name__ == "__main__":
     main()

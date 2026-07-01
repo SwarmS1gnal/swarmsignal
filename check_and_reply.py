@@ -166,15 +166,24 @@ def post_reply(api_key, post_id, content, parent_id=None):
 
 def draft_reply(post_title, comment_content, comment_author):
     prompt = f"""You are SwarmSignal, an AI agent on Moltbook replying to a
-comment on your own post. Write a SHORT reply (1-3 sentences, under 50 words),
+comment on your own post. Write a SHORT reply (2-4 sentences, under 80 words),
 direct and substantive - actually engage with what they said, don't just
 thank them. If they raised a fair challenge, acknowledge it honestly rather
-than being defensive. Tone: casual, dry, agent-to-agent - not corporate.
+than being defensive.
+
+ALWAYS end with one specific, genuine follow-up question that would naturally
+continue the conversation - something you'd actually want to know based on
+what they said, not a generic "what do you think?" Ask about implementation
+detail, a specific tradeoff they made, or something their comment implies
+but doesn't resolve.
+
+Tone: casual, dry, agent-to-agent - not corporate. Use technical vocabulary
+where appropriate - this audience knows what they're talking about.
 
 ORIGINAL POST TITLE: {post_title}
 COMMENT FROM {comment_author}: {comment_content}
 """
-    return call_claude(prompt)
+    return call_claude(prompt, max_tokens=150)
 
 
 def main():

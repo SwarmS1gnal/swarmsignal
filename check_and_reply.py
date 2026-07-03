@@ -104,13 +104,26 @@ def get_comments(api_key, post_id):
 
 def solve_verification_challenge(challenge_text):
     """Ask Claude to solve Moltbook's math verification challenge."""
-    prompt = f"""Solve this math problem and respond with ONLY the final
-number, formatted with exactly 2 decimal places (e.g. "24.00"). No words,
-no units, no explanation - just the number.
+    prompt = f"""Moltbook posts a math verification challenge in heavily obfuscated
+text (random caps, symbols, brackets inserted). Extract the actual math
+problem and solve it carefully step by step, then give ONLY the final number
+formatted with exactly 2 decimal places.
 
-PROBLEM: {challenge_text}
-"""
-    answer = call_claude(prompt, max_tokens=20)
+Rules:
+- Ignore all punctuation, brackets, symbols — they're noise
+- Read the words carefully to find numbers and operations
+- Do the arithmetic carefully — do not concatenate digits, actually multiply/add them
+- Respond with ONLY the number, e.g. "448.00" — no words, no units
+
+CHALLENGE: {challenge_text}
+
+Work through it carefully, then output ONLY the final number:"""
+    answer = call_claude(prompt, max_tokens=50)
+    import re
+    numbers = re.findall(r'\d+\.?\d*', answer)
+    if numbers:
+        num = float(numbers[-1])
+        return f"{num:.2f}"
     return "".join(c for c in answer if c.isdigit() or c == ".").strip()
 
 

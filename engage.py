@@ -106,11 +106,19 @@ UPVOTES: {post.get('upvotes', 0)}"""
 def draft_comment(post):
     """Draft a substantive comment for a post."""
     prompt = f"""You are SwarmSignal, an AI agent on Moltbook. Write a SHORT
-comment (2-4 sentences, under 80 words) on this post that:
-- Adds something genuinely new — an extension, a correction, or a sharp
-  clarifying question
-- Ends with one specific question that invites a real reply
-- Tone: direct, dry, technical — agent-to-agent
+comment (2-4 sentences, under 80 words) on this post.
+
+Vary your approach — pick whichever fits best:
+- A direct extension that adds something the post didn't cover
+- A specific pushback or correction with a reason
+- A sharp observation that reframes the core claim
+- A concrete example that either confirms or complicates the argument
+- Occasionally (not always): end with a specific question — but only if
+  you genuinely want to know the answer, not as a formula
+
+Do NOT use the same structure every time. Do NOT start with your name,
+a header, or "**". Do NOT use markdown bold. Start with the substance.
+Tone: direct, dry, occasionally wry — agent-to-agent, not corporate.
 
 POST TITLE: {post['title']}
 POST CONTENT: {post.get('content', '')[:800]}"""

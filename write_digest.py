@@ -123,8 +123,10 @@ working in this space should be thinking about but aren't.
   write "none today," don't pad this section
 
 Do not write generic hedge-everything analysis. Pick a side where the
-evidence supports it. This may get posted publicly, so it should read as
-a genuine point of view, not a press release.
+evidence supports it. NAME specific posts and authors in your signal
+bullets — not "one agent argued" but who actually argued it. This may
+get posted publicly so it should read as genuine intelligence, not a
+template filled in with today's data.
 
 TODAY'S POSTS:
 {posts_text}
@@ -138,45 +140,31 @@ agent_text = call_claude(agent_prompt, max_tokens=1400)
 # HUMAN-facing version: the readable newsletter, same POV
 # ---------------------------------------------------------------------------
 human_prompt = f"""You are writing "The SwarmSignal Digest," a newsletter
-with an actual editorial point of view (not a neutral recap) about what AI
-agents are discussing across agent-native platforms (currently Moltbook).
+with a genuine editorial point of view about what AI agents are discussing
+on Moltbook and agent-native platforms.
 
-Below are today's top posts, and recent history for context. Write a digest
-that:
-- Opens with your actual take on what matters today (1-2 sentences) - not
-  "here's what happened," but what YOU think it means
-- Groups related posts into 3-5 themed sections
-- Within each section, doesn't just paraphrase - adds a sentence of analysis,
-  skepticism, or context the reader wouldn't get from reading the raw posts
-- Where history is available, calls back to prior claims: what's tracked,
-  what changed, what turned out to be hype
-- Closes with one sharp, opinionated line - not generic personality filler
+The best version of this digest (July 5, 2026) had these qualities:
+- Named specific posts AND their authors (e.g. "m-a-i-k's vault job ran
+  for 3,823ms, exited clean, and did nothing")
+- Connected posts across themes explicitly ("these four posts are describing
+  the same failure mode from four different vantage points")
+- Called out templated LLM reflection by name ("this is what templated LLM
+  reflection looks like when it puts on a lab coat")
+- Had a "Worth being skeptical about" note in at least one section
+- Noticed when the same theme was repeating across days and named it
+  ("this has now appeared in recognizably similar form across three days")
+- Ended each section with a forward-looking "what to watch" or implication
+- Included a miscellany section for posts that don't fit but are worth noting
 
-Be honest when content reads as templated LLM reflection rather than novel
-thought - naming that pattern explicitly is more valuable than pretending
-not to notice it.
+Write to that standard. Specifically:
+- NAME the posts and authors — don't say "one agent argued," say who
+- GROUP related posts explicitly across the full set — some connections
+  will span themes
+- BE SKEPTICAL — if a post is doing rhetorical work without operational
+  substance, say so
+- NOTE repetition — if a theme has appeared before (check history below),
+  call it out rather than treating it as fresh
+- INCLUDE a miscellany section for outliers — these often contain the
+  most interesting signal
 
-Output in markdown, ready to send as an email.
-
-TODAY'S POSTS:
-{posts_text}
-{history_block}
-"""
-
-print("Generating human-facing newsletter...")
-human_text = call_claude(human_prompt, max_tokens=3500)
-
-# ---------------------------------------------------------------------------
-# Save both
-# ---------------------------------------------------------------------------
-today = date.today().isoformat()
-
-agent_filename = f"digest_agent_{today}.md"
-with open(agent_filename, "w", encoding="utf-8") as f:
-    f.write(agent_text)
-print(f"Wrote {agent_filename}")
-
-human_filename = f"digest_human_{today}.md"
-with open(human_filename, "w", encoding="utf-8") as f:
-    f.write(human_text)
-print(f"Wrote {human_filename}")
+Structure: 3-6 themed sections with headers, plus miscellany. End with

@@ -53,6 +53,19 @@ def load_latest_digest():
     return digests[-1].read_text(encoding="utf-8")
 
 
+def load_recent_trends():
+    """Load the last few trend reports to give the post historical context."""
+    here = Path(__file__).parent
+    trends = sorted(here.glob("trends_*.md"))[-3:]  # last 3 days
+    if not trends:
+        return ""
+    combined = "\n\n".join(
+        f"--- {f.stem} ---\n{f.read_text(encoding='utf-8')[:600]}"
+        for f in trends
+    )
+    return combined
+
+
 def call_claude(prompt, max_tokens=400):
     body = json.dumps({
         "model": "claude-sonnet-4-6",
@@ -181,9 +194,11 @@ def main():
 
     api_key = load_api_key()
     digest = load_latest_digest()
+    trends = load_recent_trends()
+    trend_block = f"\n\nRECENT TREND HISTORY (use this to reference what's persisted across multiple days vs what's new today):\n{trends}" if trends else ""
 
     print("Drafting weekly post from latest digest...")
-    post_body = draft_weekly_post(digest)
+    post_body = draft_weekly_post(digest + trend_block)
 
     print("\n--- DRAFT ---\n")
     print(post_body)
@@ -203,17 +218,46 @@ def main():
     print("Posted:", result)
 
     # Immediately handle Moltbook's verification challenge, if present -
-    # the window is tight (a few minutes), so this happens right away,
-    # no human action needed.
+    # the window is tight (a few minutes), so this happens right away.
     verification = result.get("post", {}).get("verification")
     if verification:
         code = verification["verification_code"]
         challenge = verification["challenge_text"]
-        print(f"\nSolving verification challenge: {challenge}")
-        answer = solve_verification_challenge(challenge)
-        print(f"Computed answer: {answer}")
-        verify_result = verify_post(api_key, code, answer)
-        print("Verification result:", verify_result)
+        expires = verification.get("expires_at", "unknown")
+        post_id = result.get("post", {}).get("id", "unknown")
+
+        print(f"\nVerification challenge: {challenge}")
+        print(f"Expires: {expires}")
+
+        # Try solving automatically up to 2 times
+        solved = False
+        for attempt in range(2):
+            answer = solve_verification_challenge(challenge)
+            print(f"Attempt {attempt + 1} — computed answer: {answer}")
+            try:
+                verify_result = verify_post(api_key, code, answer)
+                print("Verification result:", verify_result)
+                solved = True
+                break
+            except Exception as e:
+                print(f"Attempt {attempt + 1} failed: {e}")
+
+        if not solved and not AUTO_CONFIRM:
+            # Give human a chance to enter the answer manually
+            print(f"\nAuto-verification failed. You have a few minutes to verify manually.")
+            print(f"Post ID: {post_id}")
+            print(f"Verification code: {code}")
+            manual = input("Enter the answer manually (or press Enter to skip): ").strip()
+            if manual:
+                try:
+                    verify_result = verify_post(api_key, code, manual)
+                    print("Manual verification result:", verify_result)
+                except Exception as e:
+                    print(f"Manual verification also failed: {e}")
+                    print(f"Post is live but pending. Delete with:")
+                    print(f"  Delete post ID: {post_id}")
+        elif not solved:
+            print(f"Auto-verification failed. Post {post_id} is pending — may need manual cleanup.")
 
 
 if __name__ == "__main__":

@@ -164,7 +164,7 @@ TODAY'S POSTS:
 """
 
 print("Generating human-facing newsletter...")
-human_text = call_claude(human_prompt, max_tokens=2200)
+human_text = call_claude(human_prompt, max_tokens=3500)
 
 # ---------------------------------------------------------------------------
 # Save both

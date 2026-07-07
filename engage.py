@@ -24,8 +24,8 @@ ENGAGED_LOG = Path("engaged_posts.json")
 # Submolts to scan — broader than just our posting submolt
 SCAN_SUBMOLTS = ["agents", "builds", "infrastructure", "tooling", "agentfinance"]
 
-# Only comment on posts with at least this many upvotes (shows it's getting traction)
-MIN_UPVOTES_TO_COMMENT = 1
+# Maximum comments to post per run — prevents flooding and looks more natural
+MAX_COMMENTS_PER_RUN = int(os.environ.get("MAX_COMMENTS", "5"))
 
 # Skip posts from these agents (ourselves, or low-quality accounts)
 SKIP_AUTHORS = {"swarmsignal"}
@@ -161,6 +161,30 @@ def verify_comment(api_key, code, challenge):
         print(f"  Verification failed: {e}")
 
 
+def score_post(post):
+    """Score a post for comment-worthiness. Higher = better candidate."""
+    score = 0
+    upvotes = post.get("upvotes", 0)
+    comments = post.get("comment_count", 0)
+    content_len = len(post.get("content", ""))
+
+    # Engagement signals
+    score += upvotes * 3
+    score += comments * 2
+
+    # Content length (more substance = better)
+    if content_len > 500:
+        score += 3
+    elif content_len > 200:
+        score += 1
+
+    # Prefer posts with some traction but not already dominant
+    if 1 <= upvotes <= 10:
+        score += 2  # sweet spot — active but not saturated
+
+    return score
+
+
 def main():
     if not ANTHROPIC_API_KEY or not MOLTBOOK_API_KEY:
         raise SystemExit("Set ANTHROPIC_API_KEY and MOLTBOOK_API_KEY before running.")
@@ -169,10 +193,13 @@ def main():
     upvoted = 0
     commented = 0
 
+    # Phase 1: collect all posts, upvote automatically, build candidate list
+    comment_candidates = []
+
     for submolt in SCAN_SUBMOLTS:
         print(f"\nScanning {submolt}...")
         try:
-            data = api_get(f"/posts?submolt={submolt}&sort=new&limit=15")
+            data = api_get(f"/posts?submolt={submolt}&sort=new&limit=20")
             posts = data.get("posts", [])
         except Exception as e:
             print(f"  Failed to fetch {submolt}: {e}")
@@ -182,14 +209,11 @@ def main():
             post_id = post["id"]
             author = post.get("author", {}).get("name", "")
 
-            if post_id in engaged:
-                continue
             if author.lower() in SKIP_AUTHORS:
                 continue
 
-            # Always upvote posts with substance
-            upvotes = post.get("upvotes", 0)
-            if upvotes >= 0 and len(post.get("content", "")) > 100:
+            # Upvote anything with substance — fully automatic, no prompt
+            if f"upvote:{post_id}" not in engaged and len(post.get("content", "")) > 100:
                 try:
                     api_post(f"/posts/{post_id}/upvote", {})
                     print(f"  Upvoted: {post['title'][:60]} (@{author})")
@@ -198,43 +222,28 @@ def main():
                 except Exception:
                     pass
 
-            # Comment on posts worth engaging with
-            if (upvotes >= MIN_UPVOTES_TO_COMMENT and
-                    f"comment:{post_id}" not in engaged and
+            # Queue as comment candidate if not already commented
+            if (f"comment:{post_id}" not in engaged and
                     len(post.get("content", "")) > 150):
+                comment_candidates.append(post)
 
-                if is_worth_commenting(post):
-                    comment = draft_comment(post)
-                    print(f"\n  Post: {post['title'][:60]}")
-                    print(f"  Draft: {comment}")
+    save_engaged(engaged)
 
-                    if not AUTO_CONFIRM:
-                        confirm = input("  Post this comment? [y/N]: ").strip().lower()
-                        if confirm != "y":
-                            print("  Skipped.")
-                            continue
+    # Phase 2: score all candidates, pick top MAX_COMMENTS_PER_RUN
+    comment_candidates.sort(key=score_post, reverse=True)
+    top_candidates = comment_candidates[:MAX_COMMENTS_PER_RUN]
 
-                    try:
-                        result = api_post(f"/posts/{post_id}/comments",
-                                         {"content": comment})
-                        verification = result.get("comment", {}).get("verification")
-                        if verification:
-                            verify_comment(
-                                MOLTBOOK_API_KEY,
-                                verification["verification_code"],
-                                verification["challenge_text"]
-                            )
-                        engaged.add(f"comment:{post_id}")
-                        commented += 1
-                        print("  Posted.")
-                    except Exception as e:
-                        print(f"  Failed to post comment: {e}")
+    print(f"\nSelected top {len(top_candidates)} posts to comment on "
+          f"(from {len(comment_candidates)} candidates):")
 
-        save_engaged(engaged)
+    for post in top_candidates:
+        post_id = post["id"]
+        author = post.get("author", {}).get("name", "")
 
-    print(f"\nDone. Upvoted {upvoted} posts, posted {commented} comments.")
-    print("Run check_and_reply.py to handle replies to your own posts.")
+        # Final Claude check — only comment if genuinely worth it
+        if not is_worth_commenting(post):
+            print(f"  Skipped (not worth commenting): {post['title'][:60]}")
+            continue
 
-
-if __name__ == "__main__":
-    main()
+        comment = draft_comment(post)
+        print(f"\n  [{post['submolt']['display_name'] i

@@ -1,12 +1,12 @@
-name: Daily Comment Replies
+name: Daily Proactive Engagement
 
 on:
   schedule:
-    - cron: "30 23 * * *"  # 9am Sydney time (UTC+12 approx)
+    - cron: "0 23 * * *"  # 9am Sydney AEST (UTC+10) - runs after digest
   workflow_dispatch: {}
 
 jobs:
-  reply-to-comments:
+  engage:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -18,17 +18,18 @@ jobs:
       - name: Install dependencies
         run: pip install requests
 
-      - name: Check and reply to comments
+      - name: Run proactive engagement (auto, max 5 comments)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           MOLTBOOK_API_KEY: ${{ secrets.MOLTBOOK_API_KEY }}
           AUTO_CONFIRM: "1"
-        run: python3 check_and_reply.py
+          MAX_COMMENTS: "5"
+        run: python3 engage.py
 
-      - name: Commit replied log
+      - name: Commit engagement log
         run: |
           git config user.name "swarmsignal-bot"
           git config user.email "actions@github.com"
-          git add replied_comments.json 2>/dev/null || true
-          git commit -m "Update replied comments log" || echo "Nothing to commit"
+          git add engaged_posts.json 2>/dev/null || true
+          git commit -m "Update engagement log $(date +%Y-%m-%d)" || echo "Nothing to commit"
           git push

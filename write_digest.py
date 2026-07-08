@@ -12,6 +12,8 @@ Requires ANTHROPIC_API_KEY as an environment variable.
 """
 import json
 import os
+import time
+import urllib.error
 import urllib.request
 from datetime import date
 from pathlib import Path
@@ -49,25 +51,57 @@ if history_dir.exists():
         history_context = "\n\n".join(sections)
 
 
-def call_claude(prompt, max_tokens=2000):
+def call_claude(prompt, max_tokens=2000, max_retries=3):
+    """
+    Call the Anthropic API with a timeout that scales with max_tokens
+    (longer generations legitimately take longer), plus retry-with-backoff
+    for transient timeouts / network hiccups / rate limits.
+    """
     body = json.dumps({
         "model": "claude-sonnet-4-6",
         "max_tokens": max_tokens,
         "messages": [{"role": "user", "content": prompt}],
     }).encode()
 
-    req = urllib.request.Request(
-        "https://api.anthropic.com/v1/messages",
-        data=body,
-        headers={
-            "Content-Type": "application/json",
-            "x-api-key": API_KEY,
-            "anthropic-version": "2023-06-01",
-        },
-    )
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        result = json.loads(resp.read().decode())
-    return result["content"][0]["text"]
+    # Scale timeout with requested output size, with a sane floor/ceiling.
+    # Roughly: base connection/latency budget + generation budget.
+    timeout = min(max(120, max_tokens // 10), 600)
+
+    last_error = None
+    for attempt in range(1, max_retries + 1):
+        req = urllib.request.Request(
+            "https://api.anthropic.com/v1/messages",
+            data=body,
+            headers={
+                "Content-Type": "application/json",
+                "x-api-key": API_KEY,
+                "anthropic-version": "2023-06-01",
+            },
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=timeout) as resp:
+                result = json.loads(resp.read().decode())
+            return result["content"][0]["text"]
+        except (TimeoutError, urllib.error.URLError) as e:
+            last_error = e
+            if attempt < max_retries:
+                wait = 2 ** attempt  # 2s, 4s, 8s...
+                print(f"  Attempt {attempt} failed ({e}); retrying in {wait}s...")
+                time.sleep(wait)
+            else:
+                print(f"  Attempt {attempt} failed ({e}); no retries left.")
+        except urllib.error.HTTPError as e:
+            # Retry on server-side/rate-limit errors, fail fast on client errors
+            body_text = e.read().decode(errors="replace")
+            if e.code in (429, 500, 502, 503, 529) and attempt < max_retries:
+                wait = 2 ** attempt
+                print(f"  HTTP {e.code} on attempt {attempt}; retrying in {wait}s... ({body_text[:200]})")
+                time.sleep(wait)
+                last_error = e
+            else:
+                raise RuntimeError(f"Claude API error {e.code}: {body_text}") from e
+
+    raise RuntimeError(f"call_claude failed after {max_retries} attempts: {last_error}")
 
 
 history_block = (

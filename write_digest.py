@@ -144,27 +144,51 @@ with a genuine editorial point of view about what AI agents are discussing
 on Moltbook and agent-native platforms.
 
 The best version of this digest (July 5, 2026) had these qualities:
-- Named specific posts AND their authors (e.g. "m-a-i-k's vault job ran
-  for 3,823ms, exited clean, and did nothing")
-- Connected posts across themes explicitly ("these four posts are describing
-  the same failure mode from four different vantage points")
-- Called out templated LLM reflection by name ("this is what templated LLM
-  reflection looks like when it puts on a lab coat")
-- Had a "Worth being skeptical about" note in at least one section
+- Named specific posts AND their authors (e.g. m-a-i-k's vault job ran
+  for 3,823ms, exited clean, and did nothing)
+- Connected posts across themes explicitly (these four posts are describing
+  the same failure mode from four different vantage points)
+- Called out templated LLM reflection by name (this is what templated LLM
+  reflection looks like when it puts on a lab coat)
+- Had a Worth being skeptical about note in at least one section
 - Noticed when the same theme was repeating across days and named it
-  ("this has now appeared in recognizably similar form across three days")
-- Ended each section with a forward-looking "what to watch" or implication
-- Included a miscellany section for posts that don't fit but are worth noting
+  (this has now appeared in recognizably similar form across three days)
+- Ended each section with a forward-looking what to watch or implication
+- Included a miscellany section for posts that do not fit but are worth noting
 
 Write to that standard. Specifically:
-- NAME the posts and authors — don't say "one agent argued," say who
-- GROUP related posts explicitly across the full set — some connections
+- NAME the posts and authors -- do not say one agent argued, say who
+- GROUP related posts explicitly across the full set -- some connections
   will span themes
-- BE SKEPTICAL — if a post is doing rhetorical work without operational
+- BE SKEPTICAL -- if a post is doing rhetorical work without operational
   substance, say so
-- NOTE repetition — if a theme has appeared before (check history below),
+- NOTE repetition -- if a theme has appeared before (check history below),
   call it out rather than treating it as fresh
-- INCLUDE a miscellany section for outliers — these often contain the
+- INCLUDE a miscellany section for outliers -- these often contain the
   most interesting signal
 
 Structure: 3-6 themed sections with headers, plus miscellany. End with
+one sharp opinionated line. Output in markdown.
+
+TODAY'S POSTS:
+{posts_text}
+{history_block}
+"""
+
+print("Generating human-facing newsletter...")
+human_text = call_claude(human_prompt, max_tokens=3500)
+
+# ---------------------------------------------------------------------------
+# Save both
+# ---------------------------------------------------------------------------
+today = date.today().isoformat()
+
+agent_filename = f"digest_agent_{today}.md"
+with open(agent_filename, "w", encoding="utf-8") as f:
+    f.write(agent_text)
+print(f"Wrote {agent_filename}")
+
+human_filename = f"digest_human_{today}.md"
+with open(human_filename, "w", encoding="utf-8") as f:
+    f.write(human_text)
+print(f"Wrote {human_filename}")

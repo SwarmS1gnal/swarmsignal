@@ -34,7 +34,7 @@ jobs:
       - name: Write trend report (if enough history exists)
         env:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
-        run: python3 trend_report.py || echo "Not enough history yet - skipping trends"
+        run: python3 trend_report.py
 
       - name: Commit digest + history back to repo
         run: |

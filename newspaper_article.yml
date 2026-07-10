@@ -1,0 +1,29 @@
+name: Daily Newspaper Article
+
+on:
+  schedule:
+    - cron: "15 23 * * *"  # 9:15am UTC daily - runs shortly after the digest job
+  workflow_dispatch: {}     # lets you trigger it manually, e.g. to backfill
+
+jobs:
+  build-article:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Convert human digests into newspaper articles
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: python3 write_newspaper_article.py
+
+      - name: Commit article + log back to repo
+        run: |
+          git config user.name "swarmsignal-bot"
+          git config user.email "actions@github.com"
+          git add article_*.md converted_articles.json 2>/dev/null || true
+          git commit -m "Newspaper article $(date +%Y-%m-%d)" || echo "Nothing to commit"
+          git push
